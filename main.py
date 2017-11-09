@@ -42,6 +42,8 @@ BATCH_SIZE = 8
 NUM_OF_TRAINING_IMAGES = 26752
 NUM_OF_VALIDATION_IMAGES = 3855
 
+MODEL = None
+
 # Convert a tuple or struct_time representing a time as returned by gmtime() or localtime() in a date and time format
 CURRENT_TIME = time.strftime("%c")
 # Generating graphs from the TensorFlow processing at different paths for each run (based on time of run)
@@ -125,7 +127,8 @@ def train_model():
     output_layer = Dense(NUMBER_OF_CLASSES, activation='softmax')(x)
 
     # this is the model we will train
-    model = Model(inputs=base_model.input, outputs=output_layer)
+    global MODEL
+    MODEL = Model(inputs=base_model.input, outputs=output_layer)
 
     # saving the best weights found at current run of the network model, saved to binary file assigned to filepath
     checkpointer = ModelCheckpoint(filepath = "./weights.hdf5", verbose = 1, save_best_only = True, monitor = 'val_loss')    # Reference: https://keras.io/callbacks/#modelcheckpoint
@@ -139,14 +142,14 @@ def train_model():
     #model.load_weights('./weights.hdf5')        # Loading initial weights from file; reference: https://keras.io/getting-started/faq/
 
     # compile the model
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])   # categorical_crossentropy is for negative log likelihood
+    MODEL.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy', 'top_k_categorical_accuracy'])   # categorical_crossentropy is for negative log likelihood
 
     # print out summary of my model
-    model.summary()      
+    MODEL.summary()      
 
     print 'Now Training...'
     # train model
-    model.fit_generator(
+    MODEL.fit_generator(
             tr_generator,
             steps_per_epoch=NUM_OF_TRAINING_IMAGES//BATCH_SIZE,
             epochs=EPOCHS,
@@ -154,13 +157,21 @@ def train_model():
             validation_steps=NUM_OF_VALIDATION_IMAGES//BATCH_SIZE,
             verbose=1, callbacks=[TENSORBOARD_CALLBACK, checkpointer,reduce_lr])
 
-#def test_model():
-
+def evaluate_model():
+    global MODEL
+    print 'Now Evaluating Model...'
+    results = MODEL.evaluate_generator(val_generator, NUM_OF_VALIDATION_IMAGES//BATCH_SIZE)
+    print ('Accuracy = %s' + str(results[1]*100))
+    print ('ACCR5 = %s' + str(results[2]*100))
 
 def main():
     #generate_validation_dataset(15)
+    
     train_model()
-    print 'Done!'
+    print 'Training Done!'
+
+    evaluate_model()
+    print 'Evaluation Done!'
 
 if __name__ == "__main__":
     main()
